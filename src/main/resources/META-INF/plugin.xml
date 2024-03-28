@@ -19,6 +19,9 @@
         <extensionPoint name="scalaSdkExtension"
                         interface="org.jetbrains.plugins.bsp.scala.sdk.ScalaSdkExtension"
                         dynamic="true"/>
+        <extensionPoint name="sbtBuildModuleBspExtension"
+                        interface="org.jetbrains.plugins.bsp.sbt.SbtBuildModuleBspExtension"
+                        dynamic="true"/>
         <extensionPoint name="androidSdkGetterExtension"
                         interface="org.jetbrains.plugins.bsp.android.AndroidSdkGetterExtension"
                         dynamic="true"/>
@@ -111,6 +114,8 @@
         <runLineMarkerContributor
                 implementationClass="org.jetbrains.plugins.bsp.ui.gutters.BspJVMRunLineMarkerContributor"
                 language="JVM"/>
+        <registryKey defaultValue="true" description="Enable Sbt for BSP support"
+                     key="bsp.sbt.support"/>
         <registryKey defaultValue="600" description="Timeout for BSP requests in seconds"
                      key="bsp.request.timeout.seconds"/>
         <registryKey defaultValue="true" description="Choose default connection"

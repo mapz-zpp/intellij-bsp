@@ -2,6 +2,8 @@ package org.jetbrains.plugins.bsp.server.tasks
 
 import ch.epfl.scala.bsp4j.BuildTarget
 import ch.epfl.scala.bsp4j.BuildTargetIdentifier
+import ch.epfl.scala.bsp4j.SbtBuildTarget
+import ch.epfl.scala.bsp4j.BuildTargetDataKind
 import ch.epfl.scala.bsp4j.DependencySourcesItem
 import ch.epfl.scala.bsp4j.DependencySourcesParams
 import ch.epfl.scala.bsp4j.JavacOptionsParams
@@ -44,6 +46,7 @@ import org.jetbrains.bsp.protocol.utils.extractAndroidBuildTarget
 import org.jetbrains.bsp.protocol.utils.extractJvmBuildTarget
 import org.jetbrains.bsp.protocol.utils.extractPythonBuildTarget
 import org.jetbrains.bsp.protocol.utils.extractScalaBuildTarget
+import org.jetbrains.bsp.protocol.utils.extractSbtBuildTarget
 import org.jetbrains.plugins.bsp.android.AndroidSdk
 import org.jetbrains.plugins.bsp.android.AndroidSdkGetterExtension
 import org.jetbrains.plugins.bsp.android.androidSdkGetterExtension
@@ -74,6 +77,8 @@ import org.jetbrains.plugins.bsp.magicmetamodel.impl.workspacemodel.includesPyth
 import org.jetbrains.plugins.bsp.magicmetamodel.impl.workspacemodel.includesScala
 import org.jetbrains.plugins.bsp.magicmetamodel.impl.workspacemodel.toBuildTargetInfo
 import org.jetbrains.plugins.bsp.magicmetamodel.impl.workspacemodel.toPair
+import org.jetbrains.plugins.bsp.sbt.sbtBuildModuleBspExtension
+import org.jetbrains.plugins.bsp.sbt.sbtBuildModuleBspExtensionExists
 import org.jetbrains.plugins.bsp.scala.sdk.ScalaSdk
 import org.jetbrains.plugins.bsp.scala.sdk.scalaSdkExtension
 import org.jetbrains.plugins.bsp.scala.sdk.scalaSdkExtensionExists
@@ -115,6 +120,8 @@ public class CollectProjectDetailsTask(project: Project, private val taskId: Any
   private var pythonSdks: Set<PythonSdk>? = null
 
   private var scalaSdks: Set<ScalaSdk>? = null
+
+  private var sbtBuildModules: Set<Pair<SbtBuildTarget, BuildTargetIdentifier>>? = null
 
   private var androidSdks: Set<AndroidSdk>? = null
 
@@ -167,6 +174,12 @@ public class CollectProjectDetailsTask(project: Project, private val taskId: Any
       if (BspFeatureFlags.isScalaSupportEnabled && scalaSdkExtensionExists()) {
         reporter.indeterminateStep(text = "Calculating all unique scala sdk infos") {
           calculateAllScalaSdkInfosSubtask(projectDetails)
+        }
+      }
+
+      if (BspFeatureFlags.isSbtSupportEnabled && sbtBuildModuleBspExtensionExists()) {
+        reporter.indeterminateStep(text = "Calculating all unique sbt sdk infos") {
+          calculateAllSbtBuildModuleInfosSubtask(projectDetails)
         }
       }
 
@@ -293,6 +306,26 @@ public class CollectProjectDetailsTask(project: Project, private val taskId: Any
           sdkJars = it.jars
         )
       }
+
+  private suspend fun calculateAllSbtBuildModuleInfosSubtask(projectDetails: ProjectDetails) = withSubtask(
+    "calculate-all-sbt-build-module-infos",
+    BspPluginBundle.message("console.task.model.calculate.sbt.build.module.infos")
+  ) {
+    sbtBuildModules = logPerformance(it) {
+      calculateAllSbtBuildModuleInfos(projectDetails)
+    }
+  }
+
+  private fun calculateAllSbtBuildModuleInfos(projectDetails: ProjectDetails): Set<Pair<SbtBuildTarget, BuildTargetIdentifier>> =
+    projectDetails.targets.filter { it.dataKind == BuildTargetDataKind.SBT }
+      .mapNotNull { provideAdditionalInfoForSbtBuildModule(it) }
+      .toSet()
+
+  private fun provideAdditionalInfoForSbtBuildModule(target: BuildTarget): Pair<SbtBuildTarget, BuildTargetIdentifier>? {
+    return extractSbtBuildTarget(target)?.let {
+      it to target.id
+    }
+  }
 
   private suspend fun calculateAllPythonSdkInfosSubtask(projectDetails: ProjectDetails) = withSubtask(
     "calculate-all-python-sdk-infos",
@@ -454,6 +487,10 @@ public class CollectProjectDetailsTask(project: Project, private val taskId: Any
       addBspFetchedScalaSdks()
     }
 
+    if (BspFeatureFlags.isSbtSupportEnabled) {
+      addBspFetchedSbtBuildModules()
+    }
+
     if (BspFeatureFlags.isAndroidSupportEnabled) {
       addBspFetchedAndroidSdks()
     }
@@ -481,6 +518,16 @@ public class CollectProjectDetailsTask(project: Project, private val taskId: Any
         writeAction {
           scalaSdks?.forEach { extension.addScalaSdk(it, modifiableProvider) }
           modifiableProvider.commit()
+        }
+      }
+    }
+  }
+
+  private suspend fun addBspFetchedSbtBuildModules() {
+    sbtBuildModuleBspExtension()?.let { extension ->
+      withSubtask("add-bsp-fetched-sbt-build-modules", BspPluginBundle.message("console.task.model.add.sbt.fetched.build.modules")) {
+        sbtBuildModules?.forEach {
+            sbtBuildModuleInfo -> extension.enrichBspSbtModule(sbtBuildModuleInfo.first, sbtBuildModuleInfo.second, project)
         }
       }
     }
