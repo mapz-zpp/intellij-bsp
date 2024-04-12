@@ -5,12 +5,12 @@ import com.intellij.platform.workspace.jps.entities.LibraryRoot
 import com.intellij.platform.workspace.jps.entities.LibraryRootTypeId
 import com.intellij.platform.workspace.jps.entities.LibraryTableId
 import com.intellij.platform.workspace.jps.entities.ModuleId
+import com.intellij.workspaceModel.ide.impl.LegacyBridgeJpsEntitySourceFactory
 import org.jetbrains.plugins.bsp.magicmetamodel.impl.workspacemodel.Library
 import org.jetbrains.workspace.model.matchers.entries.ExpectedLibraryEntity
 import org.jetbrains.workspace.model.matchers.entries.shouldBeEqual
 import org.jetbrains.workspace.model.matchers.entries.shouldContainExactlyInAnyOrder
 import org.jetbrains.workspace.model.test.framework.WorkspaceModelWithParentJavaModuleBaseTest
-import org.jetbrains.workspacemodel.entities.BspEntitySource
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -18,19 +18,20 @@ import org.junit.jupiter.api.Test
 @DisplayName("LibraryEntityUpdater.addEntity(entityToAdd, parentModuleEntity) tests")
 internal class LibraryEntityUpdaterTest : WorkspaceModelWithParentJavaModuleBaseTest() {
   private lateinit var libraryEntityUpdater: LibraryEntityUpdater
+  private lateinit var workspaceModelEntityUpdaterConfig: WorkspaceModelEntityUpdaterConfig
 
   @BeforeEach
   override fun beforeEach() {
     // given
     super.beforeEach()
 
-    val workspaceModelEntityUpdaterConfig =
+    workspaceModelEntityUpdaterConfig =
       WorkspaceModelEntityUpdaterConfig(workspaceEntityStorageBuilder, virtualFileUrlManager, projectBasePath, project)
     libraryEntityUpdater = LibraryEntityUpdater(workspaceModelEntityUpdaterConfig)
   }
 
   @Test
-  fun `should add one library to the workspace model`() {
+  fun `should add one module library to the workspace model`() {
     // given
     val library = Library(
       displayName = "BSP: file:///dependency/test/1.0.0/test-1.0.0.jar",
@@ -57,7 +58,7 @@ internal class LibraryEntityUpdaterTest : WorkspaceModelWithParentJavaModuleBase
         tableId = LibraryTableId.ModuleLibraryTableId(ModuleId(parentModuleEntity.name)),
         name = "BSP: file:///dependency/test/1.0.0/test-1.0.0.jar",
         roots = listOf(expectedLibrarySourcesRoot, expectedLibraryClassesRoot),
-        entitySource = BspEntitySource,
+        entitySource = parentModuleEntity.entitySource,
       ),
     )
 
@@ -66,7 +67,7 @@ internal class LibraryEntityUpdaterTest : WorkspaceModelWithParentJavaModuleBase
   }
 
   @Test
-  fun `should add multiple libraries to the workspace model`() {
+  fun `should add multiple module libraries to the workspace model`() {
     // given
     val library1 = Library(
       displayName = "BSP: file:///dependency/test/1.0.0/test-1.0.0.jar",
@@ -126,5 +127,44 @@ internal class LibraryEntityUpdaterTest : WorkspaceModelWithParentJavaModuleBase
 
     returnedLibraryEntries shouldContainExactlyInAnyOrder expectedLibraryEntries
     loadedEntries(LibraryEntity::class.java) shouldContainExactlyInAnyOrder expectedLibraryEntries
+  }
+
+  @Test
+  fun `should add one project library to the workspace model`() {
+    // given
+    val library = Library(
+      displayName = "BSP: file:///dependency/test/1.0.0/test-1.0.0.jar",
+      sourceJars = listOf("jar:///dependency/test/1.0.0/test-1.0.0-sources.jar!/"),
+      classJars = listOf("jar:///dependency/test/1.0.0/test-1.0.0.jar!/"),
+    )
+
+    // when
+    val returnedLibraryEntity = runTestWriteAction {
+      libraryEntityUpdater.addEntity(library)
+    }
+
+    // then
+    val expectedLibrarySourcesRoot = LibraryRoot(
+      url = virtualFileUrlManager.getOrCreateFromUri("jar:///dependency/test/1.0.0/test-1.0.0-sources.jar!/"),
+      type = LibraryRootTypeId.SOURCES,
+    )
+    val expectedLibraryClassesRoot = LibraryRoot(
+      url = virtualFileUrlManager.getOrCreateFromUri("jar:///dependency/test/1.0.0/test-1.0.0.jar!/"),
+      type = LibraryRootTypeId.COMPILED,
+    )
+    val expectedLibraryEntity = ExpectedLibraryEntity(
+      libraryEntity = LibraryEntity(
+        tableId = LibraryTableId.ProjectLibraryTableId,
+        name = "BSP: file:///dependency/test/1.0.0/test-1.0.0.jar",
+        roots = listOf(expectedLibrarySourcesRoot, expectedLibraryClassesRoot),
+        entitySource = LegacyBridgeJpsEntitySourceFactory.createEntitySourceForProjectLibrary(
+          workspaceModelEntityUpdaterConfig.project,
+          null
+        ),
+      ),
+    )
+
+    returnedLibraryEntity shouldBeEqual expectedLibraryEntity
+    loadedEntries(LibraryEntity::class.java) shouldContainExactlyInAnyOrder listOf(expectedLibraryEntity)
   }
 }
