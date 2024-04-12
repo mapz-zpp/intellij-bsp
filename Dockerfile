@@ -2,7 +2,7 @@ FROM gradle:8.4-jdk17 AS plugin-build-image
 
 WORKDIR /
 COPY . .
-RUN gradle assemble --no-daemon
+RUN ./gradlew buildPlugin --no-daemon
 
 
 FROM python:3.12 AS python-build-image
