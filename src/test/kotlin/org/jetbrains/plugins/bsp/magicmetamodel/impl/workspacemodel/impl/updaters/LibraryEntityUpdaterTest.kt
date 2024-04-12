@@ -30,7 +30,7 @@ internal class LibraryEntityUpdaterTest : WorkspaceModelBaseTest() {
   }
 
   @Test
-  fun `should add one module library to the workspace model`() {
+  fun `should add one project library to the workspace model in place of module library`() {
     // given
     val library = Library(
       displayName = "BSP: file:///dependency/test/1.0.0/test-1.0.0.jar",
@@ -69,7 +69,7 @@ internal class LibraryEntityUpdaterTest : WorkspaceModelBaseTest() {
   }
 
   @Test
-  fun `should add multiple module libraries to the workspace model`() {
+  fun `should add multiple project libraries to the workspace model in place of multiple module libraries`() {
     // given
     val library1 = Library(
       displayName = "BSP: file:///dependency/test/1.0.0/test-1.0.0.jar",
@@ -138,7 +138,7 @@ internal class LibraryEntityUpdaterTest : WorkspaceModelBaseTest() {
   }
 
   @Test
-  fun `should add one project library to the workspace model`() {
+  fun `should add one project library to the workspace model in place of one project library`() {
     // given
     val library = Library(
       displayName = "BSP: file:///dependency/test/1.0.0/test-1.0.0.jar",
