@@ -50,6 +50,7 @@ public class BspTestTaskListener(private val handler: BspProcessHandler<out Any>
       }
 
       is TestFinish -> {
+        handler.notifyTextAvailable("Panie boże", ProcessOutputType.STDOUT)
         val failureMessageBuilder = when (data.status!!) {
           TestStatus.FAILED -> {
             ServiceMessageBuilder.testFailed(data.displayName)
