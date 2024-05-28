@@ -1,4 +1,4 @@
-package org.jetbrains.plugins.bsp.ui.widgets.document.targets
+package org.jetbrains.plugins.bsp.ui.widgets.file.targets
 
 import ch.epfl.scala.bsp4j.BuildTargetIdentifier
 import com.intellij.openapi.actionSystem.ActionGroup
@@ -16,28 +16,28 @@ import com.intellij.openapi.wm.StatusBarWidget
 import com.intellij.openapi.wm.StatusBarWidgetFactory
 import com.intellij.openapi.wm.impl.status.EditorBasedStatusBarPopup
 import com.intellij.openapi.wm.impl.status.widget.StatusBarWidgetsManager
-import org.jetbrains.plugins.bsp.assets.BuildToolAssetsExtension
+import org.jetbrains.plugins.bsp.assets.assets
 import org.jetbrains.plugins.bsp.config.BspPluginBundle
-import org.jetbrains.plugins.bsp.config.buildToolId
 import org.jetbrains.plugins.bsp.config.isBspProject
-import org.jetbrains.plugins.bsp.extension.points.withBuildToolIdOrDefault
+import org.jetbrains.plugins.bsp.extension.points.targetActionProvider
+import org.jetbrains.plugins.bsp.magicmetamodel.impl.workspacemodel.BuildTargetInfo
 import org.jetbrains.plugins.bsp.target.temporaryTargetUtils
+import org.jetbrains.plugins.bsp.ui.actions.target.BuildTargetAction
+import org.jetbrains.plugins.bsp.ui.widgets.tool.window.utils.fillWithEligibleActions
 import javax.swing.Icon
 
-private const val ID = "BspDocumentTargetsWidget"
+private const val ID = "org.jetbrains.bsp.BspFileTargetsWidget"
 
-public class BspDocumentTargetsWidget(project: Project) : EditorBasedStatusBarPopup(project, false) {
+public class BspFileTargetsWidget(project: Project) : EditorBasedStatusBarPopup(project, false) {
   init {
     project.temporaryTargetUtils.registerListener { update() }
   }
 
   override fun ID(): String = ID
 
-  override fun getWidgetState(file: VirtualFile?): WidgetState {
-    val assetsExtension = BuildToolAssetsExtension.ep.withBuildToolIdOrDefault(project.buildToolId)
-    return if (file == null) inactiveWidgetState(assetsExtension.icon)
-    else activeWidgetStateIfIncludedInAnyTargetOrInactiveState(file, assetsExtension.icon)
-  }
+  override fun getWidgetState(file: VirtualFile?): WidgetState =
+    if (file == null) inactiveWidgetState(project.assets.icon)
+    else activeWidgetStateIfIncludedInAnyTargetOrInactiveState(file, project.assets.icon)
 
   private fun activeWidgetStateIfIncludedInAnyTargetOrInactiveState(file: VirtualFile, icon: Icon): WidgetState {
     val targets = project.temporaryTargetUtils.getTargetsForFile(file)
@@ -52,6 +52,7 @@ public class BspDocumentTargetsWidget(project: Project) : EditorBasedStatusBarPo
     return state
   }
 
+  // TODO: https://youtrack.jetbrains.com/issue/BAZEL-988
   private fun activeWidgetState(loadedTarget: BuildTargetIdentifier?, icon: Icon): WidgetState {
     val text = loadedTarget?.uri ?: ""
     val state = WidgetState(BspPluginBundle.message("widget.tooltip.text.active"), text, true)
@@ -70,17 +71,28 @@ public class BspDocumentTargetsWidget(project: Project) : EditorBasedStatusBarPo
   }
 
   private fun calculatePopupGroup(file: VirtualFile): ActionGroup {
-    val targets = project.temporaryTargetUtils.getTargetsForFile(file)
+    val targetIds = project.temporaryTargetUtils.getTargetsForFile(file)
+    val targets = targetIds.mapNotNull { project.temporaryTargetUtils.getBuildTargetInfoForId(it) }
+    val groups = targets.map { it.calculatePopupGroup() }
 
-    val group = DefaultActionGroup()
-    return group
+    return DefaultActionGroup(groups)
   }
 
+  private fun BuildTargetInfo.calculatePopupGroup(): ActionGroup =
+    DefaultActionGroup(id, true).also {
+      if (capabilities.canCompile) {
+        it.add(BuildTargetAction(id))
+      }
+      it.fillWithEligibleActions(this, false)
+      it.addSeparator()
+      it.addAll(project.targetActionProvider?.getTargetActions(component, project, this).orEmpty())
+    }
+
   override fun createInstance(project: Project): StatusBarWidget =
-    BspDocumentTargetsWidget(project)
+    BspFileTargetsWidget(project)
 }
 
-public class BspDocumentTargetsWidgetFactory : StatusBarWidgetFactory {
+public class BspFileTargetsWidgetFactory : StatusBarWidgetFactory {
   override fun getId(): String = ID
 
   override fun getDisplayName(): String =
@@ -90,7 +102,7 @@ public class BspDocumentTargetsWidgetFactory : StatusBarWidgetFactory {
     project.isBspProject
 
   override fun createWidget(project: Project): StatusBarWidget =
-    BspDocumentTargetsWidget(project)
+    BspFileTargetsWidget(project)
 
   override fun disposeWidget(widget: StatusBarWidget) {
     Disposer.dispose(widget)
@@ -100,7 +112,7 @@ public class BspDocumentTargetsWidgetFactory : StatusBarWidgetFactory {
     true
 }
 
-internal fun Project.updateBspDocumentTargetsWidget() {
+internal fun Project.updateBspFileTargetsWidget() {
   val statusBarWidgetsManager = service<StatusBarWidgetsManager>()
-  statusBarWidgetsManager.updateWidget(BspDocumentTargetsWidgetFactory())
+  statusBarWidgetsManager.updateWidget(BspFileTargetsWidgetFactory())
 }
