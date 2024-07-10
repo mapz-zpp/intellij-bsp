@@ -1,6 +1,8 @@
 package org.jetbrains.plugins.bsp.magicmetamodel.impl.workspacemodel.impl.updaters.transformers
 
-import com.intellij.openapi.module.ModuleTypeId
+import com.intellij.openapi.module.StdModuleTypes
+import com.intellij.platform.workspace.jps.entities.ModuleTypeId
+import com.intellij.platform.workspace.jps.entities.SourceRootTypeId
 import org.jetbrains.plugins.bsp.magicmetamodel.impl.workspacemodel.ContentRoot
 import org.jetbrains.plugins.bsp.magicmetamodel.impl.workspacemodel.GenericModuleInfo
 import org.jetbrains.plugins.bsp.magicmetamodel.impl.workspacemodel.JavaAddendum
@@ -21,7 +23,7 @@ import kotlin.io.path.pathString
 public class JavaModuleToDummyJavaModulesTransformerHACK(private val projectBasePath: Path) :
   WorkspaceModelEntityPartitionTransformer<JavaModule, JavaModule> {
   internal companion object {
-    const val DUMMY_JAVA_SOURCE_MODULE_ROOT_TYPE = "java-source"
+    val DUMMY_JAVA_SOURCE_MODULE_ROOT_TYPE = SourceRootTypeId("java-source")
   }
 
   override fun transform(inputEntity: JavaModule): List<JavaModule> {
@@ -48,7 +50,7 @@ public class JavaModuleToDummyJavaModulesTransformerHACK(private val projectBase
     else JavaModule(
       genericModuleInfo = GenericModuleInfo(
         name = name,
-        type = ModuleTypeId.JAVA_MODULE,
+        type = ModuleTypeId(StdModuleTypes.JAVA.id),
         modulesDependencies = listOf(),
         librariesDependencies = listOf(),
         isDummy = true,
@@ -87,13 +89,15 @@ internal fun calculateDummyJavaModuleNames(
   dummyJavaModuleSourceRoots: List<Path>,
   projectBasePath: Path,
 ): List<String> =
-  dummyJavaModuleSourceRoots.map { calculateDummyJavaModuleName(it, projectBasePath) }
+  dummyJavaModuleSourceRoots.mapNotNull { calculateDummyJavaModuleName(it, projectBasePath) }
 
-internal fun calculateDummyJavaModuleName(sourceRoot: Path, projectBasePath: Path): String {
-  val absoluteSourceRoot = sourceRoot.toAbsolutePath().toString()
-  val absoluteProjectBasePath = projectBasePath.toAbsolutePath().toString()
-  return absoluteSourceRoot
-    .substringAfter(absoluteProjectBasePath)
+internal fun calculateDummyJavaModuleName(sourceRoot: Path, projectBasePath: Path): String? {
+  val absoluteSourceRoot = sourceRoot.toAbsolutePath()
+  val absoluteProjectBasePath = projectBasePath.toAbsolutePath()
+  // Don't create dummy Java modules for source roots outside the project directory so that they aren't indexed
+  if (!absoluteSourceRoot.startsWith(absoluteProjectBasePath)) return null
+  return absoluteSourceRoot.toString()
+    .substringAfter(absoluteProjectBasePath.toString())
     .trim { it == File.separatorChar }
     .replaceDots()
     .replace(File.separator, ".")

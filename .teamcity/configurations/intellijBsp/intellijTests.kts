@@ -1,36 +1,30 @@
 package configurations.intellijBsp
 
 import configurations.BaseConfiguration
-import jetbrains.buildServer.configs.kotlin.v2019_2.BuildSteps
-import jetbrains.buildServer.configs.kotlin.v2019_2.FailureConditions
-import jetbrains.buildServer.configs.kotlin.v2019_2.buildSteps.gradle
+import jetbrains.buildServer.configs.kotlin.v2019_2.vcs.GitVcsRoot
+import jetbrains.buildServer.configs.kotlin.v2019_2.buildSteps.bazel
 
-open class IntellijTestsBuildType(
-        name: String,
-        setupSteps: Boolean = false,
-        steps: BuildSteps.() -> Unit,
-        failureConditions: FailureConditions.() -> Unit = {},
-        artifactRules: String = ""
+open class UnitTests(
+    vcsRoot: GitVcsRoot
 ) : BaseConfiguration.BaseBuildType(
-    name = "[tests] $name",
-    vcsRoot = BaseConfiguration.IntellijBspVcs,
-    failureConditions = failureConditions,
-    artifactRules = artifactRules,
-    steps = steps,
-    setupSteps = setupSteps,
-    requirements =  {
-        contains("cloud.amazon.agent-name-prefix", "Linux-Large")
+    name = "[tests] unit tests",
+    artifactRules = "+:/home/teamcity/.cache/bazel/_bazel_teamcity/*/execroot/_main/bazel-out/k8-fastbuild/testlogs/** => testlogs.zip",
+    vcsRoot = vcsRoot,
+    steps = {
+        bazel {
+            this.name = "run unit tests"
+            id = "run_unit_tests"
+            command = "test"
+            targets = "//..."
+            param("toolPath", "/usr/local/bin")
+        }
     }
 )
 
-object UnitTests : IntellijTestsBuildType(
-    name = "unit tests",
-    artifactRules = "+:**/build/reports/**/* => reports.zip",
-    steps = {
-        gradle {
-            this.name = "run unit tests"
-            tasks = "test"
-            jdkHome = "%env.JDK_17_0%"
-        }
-    }
+object GitHub : UnitTests(
+    vcsRoot = BaseConfiguration.GitHubVcs,
+)
+
+object Space : UnitTests(
+    vcsRoot = BaseConfiguration.SpaceVcs
 )

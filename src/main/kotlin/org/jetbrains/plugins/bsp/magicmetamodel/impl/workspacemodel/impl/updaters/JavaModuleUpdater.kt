@@ -1,11 +1,13 @@
 package org.jetbrains.plugins.bsp.magicmetamodel.impl.workspacemodel.impl.updaters
 
 import com.intellij.java.workspace.entities.JavaModuleSettingsEntity
+import com.intellij.java.workspace.entities.javaSettings
 import com.intellij.platform.workspace.jps.entities.ModuleDependencyItem
 import com.intellij.platform.workspace.jps.entities.ModuleEntity
 import com.intellij.platform.workspace.jps.entities.ModuleSourceDependency
 import com.intellij.platform.workspace.jps.entities.SdkDependency
 import com.intellij.platform.workspace.jps.entities.SdkId
+import com.intellij.platform.workspace.jps.entities.modifyModuleEntity
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.impl.url.toVirtualFileUrl
 import com.intellij.pom.java.LanguageLevel
@@ -93,7 +95,8 @@ internal class JavaModuleWithSourcesUpdater(
     entityToAdd.scalaAddendum?.also { addendum ->
       returnDependencies.add(
         toLibraryDependency(
-          IntermediateLibraryDependency(addendum.scalaSdkName, true)
+          IntermediateLibraryDependency(addendum.scalaSdkName, true),
+          workspaceModelEntityUpdaterConfig.project,
         )
       )
     }
@@ -106,23 +109,24 @@ internal class JavaModuleWithSourcesUpdater(
     moduleEntity: ModuleEntity,
   ) {
     val compilerOutput =
-      JpsPaths.getJpsCompiledProductionDirectory(projectBasePath, entityToAdd.genericModuleInfo.name)
+      JpsPaths.getJpsCompiledProductionPath(projectBasePath, entityToAdd.genericModuleInfo.name)
         .toVirtualFileUrl(workspaceModelEntityUpdaterConfig.virtualFileUrlManager)
     val testCompilerOutput =
-      JpsPaths.getJpsCompiledTestDirectory(projectBasePath, entityToAdd.genericModuleInfo.name)
+      JpsPaths.getJpsCompiledTestPath(projectBasePath, entityToAdd.genericModuleInfo.name)
         .toVirtualFileUrl(workspaceModelEntityUpdaterConfig.virtualFileUrlManager)
-    builder.addEntity(
-      JavaModuleSettingsEntity(
-        inheritedCompilerOutput = false,
-        excludeOutput = true,
-        entitySource = moduleEntity.entitySource,
-      ) {
-        this.compilerOutput = compilerOutput
-        this.compilerOutputForTests = testCompilerOutput
-        this.module = moduleEntity
-        this.languageLevelId = LanguageLevel.parse(entityToAdd.javaAddendum?.languageVersion)?.name
-      },
-    )
+    val entity = JavaModuleSettingsEntity(
+      inheritedCompilerOutput = false,
+      excludeOutput = true,
+      entitySource = moduleEntity.entitySource,
+    ) {
+      this.compilerOutput = compilerOutput
+      this.compilerOutputForTests = testCompilerOutput
+      this.languageLevelId = LanguageLevel.parse(entityToAdd.javaAddendum?.languageVersion)?.name
+    }
+
+    builder.modifyModuleEntity(moduleEntity) {
+      this.javaSettings = entity
+    }
   }
 
   private companion object {
