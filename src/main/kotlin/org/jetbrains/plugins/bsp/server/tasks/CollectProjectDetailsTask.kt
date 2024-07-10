@@ -72,7 +72,6 @@ import org.jetbrains.plugins.bsp.magicmetamodel.impl.workspacemodel.includesPyth
 import org.jetbrains.plugins.bsp.magicmetamodel.impl.workspacemodel.includesScala
 import org.jetbrains.plugins.bsp.magicmetamodel.impl.workspacemodel.toBuildTargetInfo
 import org.jetbrains.plugins.bsp.performance.testing.bspTracer
-import org.jetbrains.plugins.bsp.magicmetamodel.impl.workspacemodel.toPair
 import org.jetbrains.plugins.bsp.sbt.sbtBuildModuleBspExtension
 import org.jetbrains.plugins.bsp.sbt.sbtBuildModuleBspExtensionExists
 import org.jetbrains.plugins.bsp.scala.sdk.ScalaSdk
@@ -302,8 +301,10 @@ public class CollectProjectDetailsTask(project: Project, private val taskId: Any
     "calculate-all-sbt-build-module-infos",
     BspPluginBundle.message("console.task.model.calculate.sbt.build.module.infos")
   ) {
-    sbtBuildModules = logPerformance(it) {
-      calculateAllSbtBuildModuleInfos(projectDetails)
+    runInterruptible {
+      sbtBuildModules = bspTracer.spanBuilder("calculate.all.sbt.build.module.infos.ms").use {
+        calculateAllSbtBuildModuleInfos(projectDetails)
+      }
     }
   }
 
