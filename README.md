@@ -2,6 +2,10 @@
 [![TeamCity build status](https://bazel.teamcity.com/app/rest/builds/buildType:id:Bazel_IntellijBsp_IntellijBspResults/statusIcon.svg)](https://bazel.teamcity.com/project/Bazel_IntellijBsp?branch=%3Cdefault%3E&buildTypeTab=overview&mode=builds)
 # Build Server Protocol for IntelliJ IDEA
 
+## MAPZ publish workflow
+
+Plugin is published to the [google-cloud](https://storage.googleapis.com/mapz-intellij-bsp/intellij-bsp-mapz.zip)
+
 <!-- Plugin description -->
 ## Build Server Protocol client
 
