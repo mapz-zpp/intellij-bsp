@@ -650,6 +650,8 @@ public fun calculateProjectDetailsWithCapabilities(
     else null
 
   try {
+    server.workspaceReload().get()
+
     val workspaceBuildTargetsResult =
       if (!buildProject) query(true, "workspace/buildTargets") { server.workspaceBuildTargets() }!!
         .get() else query(true, "workspace/buildAndGetBuildTargets") { server.workspaceBuildAndGetBuildTargets() }!!
